@@ -2549,6 +2549,9 @@ class UltraAdvancedSQLInjector:
             target_url = 'https://' + target_url
             
         print(f"{Colors.YELLOW}🔍 Fingerprinting: {target_url}{Colors.END}")
+        # Safe diagnostics ping
+        print(f"{Colors.YELLOW}🔎 Safe diagnostics probe...{Colors.END}")
+        self._safe_diagnostics_probe(target_url)
         
         try:
             response = self.session.get(target_url, timeout=10, verify=self.verify)
@@ -2897,6 +2900,35 @@ class UltraAdvancedSQLInjector:
         except:
             return []
 
+    def _safe_diagnostics_probe(self, target_url: str):
+        try:
+            if not target_url:
+                return
+            if not target_url.startswith(('http://', 'https://')):
+                target_url = 'https://' + target_url
+            base = target_url.split('#')[0]
+            try:
+                base = base if '?' not in base else base.split('?')[0]
+            except Exception:
+                pass
+            endpoints = [
+                base,
+                urljoin(base, '/robots.txt'),
+                urljoin(base, '/sitemap.xml')
+            ]
+            results = []
+            for ep in endpoints:
+                try:
+                    h = self._send_with_resilience('HEAD', ep, timeout=10)
+                    g = self._send_with_resilience('GET', ep, timeout=10)
+                    results.append({'url': ep, 'head': h.status_code, 'get': g.status_code, 'len': len(g.content or b'')})
+                    print(f"{Colors.CYAN}↪ {ep}{Colors.END} | HEAD {h.status_code} | GET {g.status_code} | {len(g.content or b'')} bytes")
+                except Exception as e:
+                    print(f"{Colors.YELLOW}↪ {ep}{Colors.END} | {Colors.RED}error: {e}{Colors.END}")
+            return results
+        except Exception:
+            return []
+
     def exploitation_menu(self):
         """Menu des outils d'exploitation et RCE"""
         while True:
@@ -2951,6 +2983,9 @@ class UltraAdvancedSQLInjector:
             return
             
         print(f"{Colors.YELLOW}🎯 RCE exploitation on: {target}{Colors.END}")
+        # Safe diagnostics ping
+        print(f"{Colors.YELLOW}🔎 Safe diagnostics probe...{Colors.END}")
+        self._safe_diagnostics_probe(target)
         
         # Payloads RCE avancés
         rce_payloads = {
